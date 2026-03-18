@@ -496,28 +496,30 @@ document.getElementById('pinInput').addEventListener('keydown',e=>{if(e.key==='E
 
 // ── ARRANQUE ────────────────────────────────────────────
 async function arrancar() {
-  // Cargar dispositivos autorizados desde Sheets
+  // ── VERIFICACIÓN DE DISPOSITIVO (comentada temporalmente) ──
+  // Para reactivar: descomenta este bloque cuando tengas el Device ID del empleado en Sheets
+  /*
   let devicesAutorizados = [];
   try {
     const r = await fetch(`${CONFIG.APPS_SCRIPT_URL}?action=getDispositivos`, {
-      redirect: 'follow',
-      method: 'GET'
+      redirect: 'follow', method: 'GET'
     });
     const d = await r.json();
     devicesAutorizados = Array.isArray(d) ? d.map(x => x.deviceId) : [];
-  } catch(e) {
-    console.warn('Error cargando dispositivos:', e);
-  }
+  } catch(e) { console.warn('Error cargando dispositivos:', e); }
 
   if (!devicesAutorizados.includes(DEVICE_ID)) {
     document.getElementById('stepsSection').style.display='none';
     document.getElementById('deviceBlocked').classList.add('visible');
     document.getElementById('blockedIdValue').textContent=DEVICE_ID;
-  } else {
-    const dup=verificarDuplicado();
-    if(dup) mostrarYaRegistrado(dup.ts,dup.mins);
-    else intentarGPS();
+    return;
   }
+  */
+  // ────────────────────────────────────────────────────────────
+
+  const dup=verificarDuplicado();
+  if(dup) mostrarYaRegistrado(dup.ts,dup.mins);
+  else intentarGPS();
 }
 arrancar();
 </script>
