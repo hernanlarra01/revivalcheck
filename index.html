@@ -204,12 +204,7 @@ const CONFIG = {
   RADIO: 200,
   PIN_SECRET: "MyRevival2024",
   PIN_INTERVALO: 10,
-  APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbwmgeUQkyN8XWS_8Nn2RWlAqocx9MmrDagmo33KrbZ4CO2yKWzzd-d5q5LEp6EdlOOkpA/exec",
-  DEVICES_AUTORIZADOS: [
-    "2394215D",  // Tu celular
-    "480CE7F7",  // Celular del empleado
-    "54CEB96F"   // Tu laptop
-  ]
+  APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbwmgeUQkyN8XWS_8Nn2RWlAqocx9MmrDagmo33KrbZ4CO2yKWzzd-d5q5LEp6EdlOOkpA/exec"
 };
 // ═══════════════════════════════════════════════════════
 
@@ -292,7 +287,9 @@ let pendientesActivos = [];
 
 async function cargarPendientes() {
   try {
-    const r = await fetch(`${CONFIG.APPS_SCRIPT_URL}?action=getPendientes`);
+    const r = await fetch(`${CONFIG.APPS_SCRIPT_URL}?action=getPendientes`, {
+      redirect: 'follow', method: 'GET'
+    });
     const d = await r.json();
     return Array.isArray(d) ? d : [];
   } catch(e) { return []; }
@@ -498,15 +495,31 @@ async function verificarPin() {
 document.getElementById('pinInput').addEventListener('keydown',e=>{if(e.key==='Enter')verificarPin();});
 
 // ── ARRANQUE ────────────────────────────────────────────
-if(!CONFIG.DEVICES_AUTORIZADOS.includes(DEVICE_ID)){
-  document.getElementById('stepsSection').style.display='none';
-  document.getElementById('deviceBlocked').classList.add('visible');
-  document.getElementById('blockedIdValue').textContent=DEVICE_ID;
-} else {
-  const dup=verificarDuplicado();
-  if(dup) mostrarYaRegistrado(dup.ts,dup.mins);
-  else intentarGPS();
+async function arrancar() {
+  // Cargar dispositivos autorizados desde Sheets
+  let devicesAutorizados = [];
+  try {
+    const r = await fetch(`${CONFIG.APPS_SCRIPT_URL}?action=getDispositivos`, {
+      redirect: 'follow',
+      method: 'GET'
+    });
+    const d = await r.json();
+    devicesAutorizados = Array.isArray(d) ? d.map(x => x.deviceId) : [];
+  } catch(e) {
+    console.warn('Error cargando dispositivos:', e);
+  }
+
+  if (!devicesAutorizados.includes(DEVICE_ID)) {
+    document.getElementById('stepsSection').style.display='none';
+    document.getElementById('deviceBlocked').classList.add('visible');
+    document.getElementById('blockedIdValue').textContent=DEVICE_ID;
+  } else {
+    const dup=verificarDuplicado();
+    if(dup) mostrarYaRegistrado(dup.ts,dup.mins);
+    else intentarGPS();
+  }
 }
+arrancar();
 </script>
 </body>
 </html>
