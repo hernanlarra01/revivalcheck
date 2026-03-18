@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin — Asistencia</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@300;400;600&display=swap');
+  :root { --bg:#0a0a0a; --surface:#141414; --border:#2a2a2a; --accent:#f5c518; --accent2:#00e676; --text:#f0f0f0; --muted:#666; --error:#ff4444; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--bg); color:var(--text); font-family:'IBM Plex Sans',sans-serif; min-height:100vh; padding:24px; }
+  body::before { content:''; position:fixed; inset:0; background:radial-gradient(ellipse 50% 40% at 50% 0%,rgba(245,197,24,0.04) 0%,transparent 70%); pointer-events:none; }
+
+  /* Login */
+  .login-wrap { min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px; }
+  .login-card { width:100%; max-width:340px; background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:36px 28px; position:relative; }
+  .login-card::before { content:''; position:absolute; top:0;left:0;right:0; height:2px; background:var(--accent); border-radius:16px 16px 0 0; }
+  .login-title { font-size:22px; font-weight:600; margin-bottom:6px; }
+  .login-sub { font-size:13px; color:var(--muted); margin-bottom:28px; }
+  .login-input { width:100%; background:var(--bg); border:1px solid var(--border); border-radius:8px; color:var(--text); font-family:'IBM Plex Sans',sans-serif; font-size:16px; padding:14px; outline:none; transition:border-color 0.2s; margin-bottom:12px; }
+  .login-input:focus { border-color:var(--accent); }
+  .login-error { font-size:12px; color:#ff8080; text-align:center; margin-bottom:12px; display:none; }
+  .login-error.visible { display:block; }
+  .page { display:none; max-width:440px; margin:0 auto; flex-direction:column; gap:20px; }
+  .page.visible { display:flex; }
+
+  .card { background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:28px 24px; position:relative; }
+  .card::before { content:''; position:absolute; top:0;left:0;right:0; height:2px; border-radius:16px 16px 0 0; }
+  .card.yellow::before { background:var(--accent); }
+  .card.green::before { background:var(--accent2); }
+
+  .badge { display:inline-flex; align-items:center; gap:8px; font-family:'IBM Plex Mono',monospace; font-size:10px; font-weight:600; letter-spacing:0.18em; text-transform:uppercase; padding:5px 10px; border:1px solid currentColor; border-radius:4px; margin-bottom:20px; }
+  .badge.yellow { color:var(--accent); }
+  .badge.green { color:var(--accent2); }
+  .badge .dot { width:5px;height:5px;border-radius:50%;background:currentColor;animation:pulse 1.5s infinite; }
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.2}}
+
+  /* PIN */
+  .pin-display { font-family:'IBM Plex Mono',monospace; font-size:58px; font-weight:700; letter-spacing:0.2em; color:var(--accent); line-height:1; margin-bottom:16px; text-shadow:0 0 40px rgba(245,197,24,0.25); }
+  .timer-row { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
+  .timer-label { font-size:11px; color:var(--muted); font-family:'IBM Plex Mono',monospace; letter-spacing:0.05em; }
+  .timer-cd { font-family:'IBM Plex Mono',monospace; font-size:13px; font-weight:600; }
+  .progress-bar { height:3px; background:var(--border); border-radius:2px; overflow:hidden; margin-bottom:20px; }
+  .progress-fill { height:100%; background:var(--accent); border-radius:2px; transition:width 1s linear; }
+  .clock-row { display:flex; justify-content:space-between; align-items:flex-end; padding-top:16px; border-top:1px solid var(--border); }
+  .clock-now { font-family:'IBM Plex Mono',monospace; font-size:22px; font-weight:600; }
+  .clock-date { font-size:11px; color:var(--muted); text-align:right; text-transform:capitalize; line-height:1.6; }
+
+  /* Pendientes */
+  .section-title { font-size:14px; font-weight:600; margin-bottom:16px; }
+  .pendientes-list { display:flex; flex-direction:column; gap:8px; margin-bottom:16px; min-height:40px; }
+  .p-item { display:flex; align-items:flex-start; gap:10px; padding:11px 13px; border-radius:8px; border:1px solid var(--border); background:var(--bg); font-size:13px; }
+  .p-item-text { flex:1; }
+  .p-item-nota { font-size:11px; color:var(--muted); margin-top:2px; }
+  .p-item-del { background:none; border:none; color:var(--muted); font-size:16px; cursor:pointer; padding:0 4px; line-height:1; flex-shrink:0; transition:color 0.2s; }
+  .p-item-del:hover { color:var(--error); }
+  .p-empty { font-size:13px; color:var(--muted); text-align:center; padding:16px 0; }
+
+  /* Formulario agregar */
+  .add-form { display:flex; flex-direction:column; gap:10px; padding-top:14px; border-top:1px solid var(--border); }
+  .add-form label { font-size:11px; color:var(--muted); font-family:'IBM Plex Mono',monospace; letter-spacing:0.08em; text-transform:uppercase; }
+  .add-form input, .add-form textarea {
+    width:100%; background:var(--bg); border:1px solid var(--border); border-radius:8px;
+    color:var(--text); font-family:'IBM Plex Sans',sans-serif; font-size:13px;
+    padding:10px 12px; outline:none; resize:none; transition:border-color 0.2s;
+  }
+  .add-form input:focus, .add-form textarea:focus { border-color:var(--accent2); }
+  .add-form textarea { height:60px; }
+
+  .btn { width:100%; padding:12px; border-radius:8px; border:none; font-family:'IBM Plex Sans',sans-serif; font-size:14px; font-weight:600; cursor:pointer; transition:all 0.2s; letter-spacing:0.04em; }
+  .btn:hover { filter:brightness(1.1); }
+  .btn:active { transform:scale(0.98); }
+  .btn:disabled { opacity:0.4; cursor:not-allowed; }
+  .btn.green { background:var(--accent2); color:#000; }
+  .btn.yellow { background:var(--accent); color:#000; }
+  .btn.ghost { background:transparent; border:1px solid var(--border); color:var(--muted); }
+  .btn.ghost:hover { border-color:var(--error); color:var(--error); }
+
+  .status-msg { font-size:12px; text-align:center; padding:8px; border-radius:6px; display:none; animation:fadeIn 0.3s ease; }
+  .status-msg.ok { background:rgba(0,230,118,0.08); border:1px solid rgba(0,230,118,0.3); color:#00e676; display:block; }
+  .status-msg.err { background:rgba(255,68,68,0.08); border:1px solid rgba(255,68,68,0.3); color:#ff8080; display:block; }
+
+  .info-box { background:rgba(245,197,24,0.05); border:1px solid rgba(245,197,24,0.15); border-radius:8px; padding:12px; font-size:12px; color:var(--muted); line-height:1.6; }
+  .info-box strong { color:var(--accent); display:block; margin-bottom:3px; font-size:10px; letter-spacing:0.1em; text-transform:uppercase; }
+
+  @keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+</style>
+</head>
+<body>
+
+<!-- Login -->
+<div class="login-wrap" id="loginWrap">
+  <div class="login-card">
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:0.15em;margin-bottom:20px;">● REVIVAL 136</div>
+    <div class="login-title">Panel Admin</div>
+    <div class="login-sub">Ingresa tu contraseña para continuar</div>
+    <input type="password" class="login-input" id="loginPass" placeholder="Contraseña" autocomplete="off">
+    <div class="login-error" id="loginError">Contraseña incorrecta</div>
+    <button class="btn yellow" onclick="intentarLogin()" style="width:100%;padding:14px;border-radius:8px;border:none;font-family:'IBM Plex Sans',sans-serif;font-size:14px;font-weight:600;cursor:pointer;background:var(--accent);color:#000;">Entrar</button>
+  </div>
+</div>
+
+<div class="page" id="adminPage">
+
+  <!-- PIN Card -->
+  <div class="card yellow">
+    <div class="badge yellow"><span class="dot"></span>Panel Admin</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:10px;">PIN activo ahora</div>
+    <div class="pin-display" id="pinDisplay">------</div>
+    <div class="timer-row">
+      <span class="timer-label">CAMBIA EN</span>
+      <span class="timer-cd" id="countdown">--:--</span>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:100%"></div></div>
+    <div class="info-box">
+      <strong>¿Cómo usar?</strong>
+      Si el empleado tiene problema con GPS, muéstrale este PIN. Cambia cada 10 minutos automáticamente.
+    </div>
+    <div class="clock-row" style="margin-top:16px;">
+      <div class="clock-now" id="clockNow">--:--:--</div>
+      <div class="clock-date" id="clockDate"></div>
+    </div>
+  </div>
+
+  <!-- Pendientes Card -->
+  <div class="card green">
+    <div class="badge green"><span class="dot"></span>Pendientes del día</div>
+    <div class="section-title">Tareas activas</div>
+
+    <div class="pendientes-list" id="pendientesList">
+      <div class="p-empty">Cargando...</div>
+    </div>
+
+    <div class="add-form">
+      <div>
+        <label>Nueva tarea</label>
+        <input type="text" id="inputTarea" placeholder="Ej. Revisar inventario de herramientas" maxlength="120">
+      </div>
+      <div>
+        <label>Nota adicional (opcional)</label>
+        <textarea id="inputNota" placeholder="Ej. Revisar bodega 2 solamente"></textarea>
+      </div>
+      <button class="btn green" onclick="agregarPendiente()">+ Agregar tarea</button>
+      <div class="status-msg" id="statusMsg"></div>
+    </div>
+
+    <div style="padding-top:14px;border-top:1px solid var(--border);margin-top:6px;">
+      <button class="btn ghost" onclick="limpiarTodos()" style="font-size:12px;padding:10px;">🗑 Limpiar todos los pendientes</button>
+    </div>
+  </div>
+
+  <!-- Recurrentes Card -->
+  <div class="card" style="--top-color:#a78bfa;">
+    <div class="badge" style="color:#a78bfa;border-color:#a78bfa;"><span class="dot" style="background:#a78bfa;"></span>Tareas Recurrentes</div>
+    <div class="section-title">Se activan automáticamente cada X días</div>
+
+    <div id="recurrentesList" style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px;min-height:40px;">
+      <div class="p-empty">Cargando...</div>
+    </div>
+
+    <div class="add-form">
+      <div>
+        <label>Tarea</label>
+        <input type="text" id="rTarea" placeholder="Ej. Fumigación edificio" maxlength="120">
+      </div>
+      <div>
+        <label>Nota (opcional)</label>
+        <input type="text" id="rNota" placeholder="Ej. Llamar al proveedor primero">
+      </div>
+      <div style="display:flex;gap:10px;">
+        <div style="flex:1">
+          <label>Cada cuántos días</label>
+          <input type="number" id="rIntervalo" placeholder="30" min="1" max="365" style="text-align:center;">
+        </div>
+        <div style="flex:1">
+          <label>Fecha de inicio</label>
+          <input type="date" id="rInicio">
+        </div>
+      </div>
+      <button class="btn" style="background:#a78bfa;color:#000;" onclick="agregarRecurrente()">+ Agregar tarea recurrente</button>
+      <div class="status-msg" id="statusRec"></div>
+    </div>
+
+    <div style="padding-top:14px;border-top:1px solid var(--border);margin-top:6px;">
+      <div class="info-box" style="border-color:rgba(167,139,250,0.2);background:rgba(167,139,250,0.04);">
+        <strong style="color:#a78bfa;">¿Cómo funciona?</strong>
+        Cada día a las 7am el sistema revisa si alguna tarea cumplió su intervalo. Si sí, la agrega automáticamente a los pendientes del día y te manda un email. Si no se palomea, seguirá apareciendo cada día hasta que se complete.
+      </div>
+    </div>
+  </div>
+
+  <!-- Dispositivos Card -->
+  <div class="card" style="--top-color:#38bdf8;">
+    <div class="badge" style="color:#38bdf8;border-color:#38bdf8;"><span class="dot" style="background:#38bdf8;"></span>Dispositivos Autorizados</div>
+    <div class="section-title">Equipos con acceso al sistema</div>
+
+    <div id="dispositivosList" style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px;min-height:40px;">
+      <div class="p-empty">Cargando...</div>
+    </div>
+
+    <div class="add-form">
+      <div>
+        <label>Nombre del equipo</label>
+        <input type="text" id="dNombre" placeholder="Ej. Celular Hernán" maxlength="60">
+      </div>
+      <div>
+        <label>Device ID</label>
+        <input type="text" id="dDeviceId" placeholder="Ej. A3F9BC12" maxlength="20" style="font-family:monospace;letter-spacing:0.1em;text-transform:uppercase;">
+      </div>
+      <button class="btn" style="background:#38bdf8;color:#000;" onclick="agregarDispositivo()">+ Agregar dispositivo</button>
+      <div class="status-msg" id="statusDev"></div>
+    </div>
+
+    <div style="padding-top:14px;border-top:1px solid var(--border);margin-top:6px;">
+      <div class="info-box" style="border-color:rgba(56,189,248,0.2);background:rgba(56,189,248,0.04);">
+        <strong style="color:#38bdf8;">¿Cómo obtener el Device ID?</strong>
+        El empleado abre el QR desde su celular — si no está autorizado, la pantalla muestra su Device ID. Cópialo y agrégalo aquí.
+      </div>
+    </div>
+  </div>
+
+</div><!-- /adminPage -->
+
+<script>
+// ═══════════════════════════════════════════════════════
+// CONFIGURACIÓN
+// ═══════════════════════════════════════════════════════
+const PIN_SECRET    = "MyRevival2024";
+const PIN_INTERVALO = 10;
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwmgeUQkyN8XWS_8Nn2RWlAqocx9MmrDagmo33KrbZ4CO2yKWzzd-d5q5LEp6EdlOOkpA/exec";
+// ═══════════════════════════════════════════════════════
+
+// ── LOGIN ───────────────────────────────────────────────
+async function intentarLogin() {
+  const pass = document.getElementById('loginPass').value.trim();
+  if (!pass) return;
+  try {
+    const r = await fetch(`${APPS_SCRIPT_URL}?action=verificarPassword&pass=${encodeURIComponent(pass)}`);
+    const d = await r.json();
+    if (d.ok) {
+      sessionStorage.setItem('adminAuth', '1');
+      document.getElementById('loginWrap').style.display = 'none';
+      document.getElementById('adminPage').classList.add('visible');
+      iniciarAdmin();
+    } else {
+      document.getElementById('loginError').classList.add('visible');
+      document.getElementById('loginPass').value = '';
+      document.getElementById('loginPass').focus();
+    }
+  } catch(e) {
+    document.getElementById('loginError').textContent = 'Error de conexión';
+    document.getElementById('loginError').classList.add('visible');
+  }
+}
+document.addEventListener('DOMContentLoaded', () => {
+  // Si ya estaba autenticado en esta sesión
+  if (sessionStorage.getItem('adminAuth') === '1') {
+    document.getElementById('loginWrap').style.display = 'none';
+    document.getElementById('adminPage').classList.add('visible');
+    iniciarAdmin();
+  }
+  document.getElementById('loginPass').addEventListener('keydown', e => {
+    if (e.key === 'Enter') intentarLogin();
+  });
+});
+
+function iniciarAdmin() {
+  actualizarPIN();
+  setInterval(actualizarPIN, 1000);
+  cargarPendientes();
+  cargarRecurrentes();
+  cargarDispositivos();
+}
+// ───────────────────────────────────────────────────────
+
+// ── PIN ─────────────────────────────────────────────────
+function calcularPIN() {
+  const n=new Date(), v=Math.floor((n.getHours()*60+n.getMinutes())/PIN_INTERVALO);
+  const s=`${PIN_SECRET}-${n.toDateString()}-${v}`;
+  let h=0; for(let i=0;i<s.length;i++){h=((h<<5)-h)+s.charCodeAt(i);h|=0;}
+  return String(Math.abs(h)%1000000).padStart(6,'0');
+}
+
+function segsRestantes() {
+  const n=new Date(), total=PIN_INTERVALO*60;
+  return total - ((n.getMinutes()%PIN_INTERVALO)*60+n.getSeconds());
+}
+
+function actualizarPIN() {
+  const n=new Date();
+  document.getElementById('clockNow').textContent = n.toLocaleTimeString('es-MX',{hour12:false});
+  document.getElementById('clockDate').textContent = n.toLocaleDateString('es-MX',{weekday:'long',day:'numeric',month:'long'});
+  document.getElementById('pinDisplay').textContent = calcularPIN();
+  const rest=segsRestantes(), total=PIN_INTERVALO*60;
+  const m=Math.floor(rest/60), s=rest%60;
+  document.getElementById('countdown').textContent=`${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  document.getElementById('progressFill').style.width=`${(rest/total)*100}%`;
+}
+actualizarPIN();
+
+// ── PENDIENTES ──────────────────────────────────────────
+let pendientes = [];
+
+async function cargarPendientes() {
+  document.getElementById('pendientesList').innerHTML = '<div class="p-empty">Cargando...</div>';
+  try {
+    const r = await fetch(`${APPS_SCRIPT_URL}?action=getPendientes`);
+    const d = await r.json();
+    pendientes = Array.isArray(d) ? d : [];
+    renderPendientes();
+  } catch(e) {
+    document.getElementById('pendientesList').innerHTML = '<div class="p-empty" style="color:#ff8080">Error al cargar. Verifica la URL del Apps Script.</div>';
+  }
+}
+
+function renderPendientes() {
+  const el = document.getElementById('pendientesList');
+  if (pendientes.length === 0) {
+    el.innerHTML = '<div class="p-empty">Sin tareas activas hoy</div>'; return;
+  }
+  el.innerHTML = pendientes.map((p,i) => `
+    <div class="p-item">
+      <span style="font-size:15px;flex-shrink:0;margin-top:1px">📌</span>
+      <div class="p-item-text">
+        <div>${p.tarea}</div>
+        ${p.nota?`<div class="p-item-nota">${p.nota}</div>`:''}
+      </div>
+      <button class="p-item-del" onclick="eliminarPendiente(${i})" title="Eliminar">✕</button>
+    </div>`).join('');
+}
+
+async function guardarPendientes() {
+  try {
+    await fetch(APPS_SCRIPT_URL, {
+      method:'POST', mode:'no-cors',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ action:'setPendientes', pendientes })
+    });
+    return true;
+  } catch(e) { return false; }
+}
+
+function mostrarStatus(msg, tipo) {
+  const el = document.getElementById('statusMsg');
+  el.textContent = msg; el.className = `status-msg ${tipo}`;
+  setTimeout(()=>{ el.className='status-msg'; }, 3000);
+}
+
+async function agregarPendiente() {
+  const tarea = document.getElementById('inputTarea').value.trim();
+  const nota  = document.getElementById('inputNota').value.trim();
+  if (!tarea) { mostrarStatus('Escribe una tarea primero', 'err'); return; }
+  pendientes.push({ tarea, nota });
+  renderPendientes();
+  document.getElementById('inputTarea').value = '';
+  document.getElementById('inputNota').value = '';
+  const ok = await guardarPendientes();
+  mostrarStatus(ok ? '✓ Tarea guardada' : '⚠ Error al guardar — verifica la URL', ok?'ok':'err');
+}
+
+function eliminarPendiente(i) {
+  if (!confirm(`¿Eliminar: "${pendientes[i].tarea}"?`)) return;
+  pendientes.splice(i,1);
+  renderPendientes();
+  guardarPendientes().then(ok => mostrarStatus(ok?'✓ Eliminado':'⚠ Error al guardar',ok?'ok':'err'));
+}
+
+async function limpiarTodos() {
+  if (!confirm('¿Limpiar todos los pendientes de hoy?')) return;
+  pendientes = [];
+  renderPendientes();
+  const ok = await guardarPendientes();
+  mostrarStatus(ok?'✓ Lista limpiada':'⚠ Error al guardar', ok?'ok':'err');
+}
+
+// ── RECURRENTES ─────────────────────────────────────────
+let recurrentes = [];
+
+async function cargarRecurrentes() {
+  document.getElementById('recurrentesList').innerHTML = '<div class="p-empty">Cargando...</div>';
+  try {
+    const r = await fetch(`${APPS_SCRIPT_URL}?action=getRecurrentes`);
+    const d = await r.json();
+    recurrentes = Array.isArray(d) ? d : [];
+    renderRecurrentes();
+  } catch(e) {
+    document.getElementById('recurrentesList').innerHTML = '<div class="p-empty" style="color:#ff8080">Error al cargar.</div>';
+  }
+}
+
+function renderRecurrentes() {
+  const el = document.getElementById('recurrentesList');
+  if (recurrentes.length === 0) {
+    el.innerHTML = '<div class="p-empty">Sin tareas recurrentes configuradas</div>'; return;
+  }
+  el.innerHTML = recurrentes.map((r, i) => {
+    const proxima = calcularProxima(r);
+    return `
+    <div class="p-item" style="flex-direction:column;align-items:stretch;gap:6px;">
+      <div style="display:flex;align-items:flex-start;gap:10px;">
+        <span style="font-size:15px;flex-shrink:0;margin-top:2px">🔁</span>
+        <div class="p-item-text">
+          <div>${r.tarea}</div>
+          ${r.nota?`<div class="p-item-nota">${r.nota}</div>`:''}
+        </div>
+        <button class="p-item-del" onclick="eliminarRecurrente(${i})" title="Eliminar">✕</button>
+      </div>
+      <div style="display:flex;gap:8px;padding-left:25px;flex-wrap:wrap;">
+        <span style="font-size:10px;font-family:monospace;color:#a78bfa;padding:2px 8px;border:1px solid rgba(167,139,250,0.3);border-radius:10px;">Cada ${r.intervalo} días</span>
+        <span style="font-size:10px;font-family:monospace;color:var(--muted);padding:2px 8px;border:1px solid var(--border);border-radius:10px;">${proxima}</span>
+        ${r.ultimaComp?`<span style="font-size:10px;font-family:monospace;color:var(--muted);padding:2px 8px;border:1px solid var(--border);border-radius:10px;">Última: ${r.ultimaComp}</span>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function calcularProxima(r) {
+  try {
+    const ref = r.ultimaComp ? new Date(r.ultimaComp) : new Date(r.inicio);
+    const proxima = new Date(ref);
+    proxima.setDate(proxima.getDate() + parseInt(r.intervalo));
+    const hoy = new Date(); hoy.setHours(0,0,0,0);
+    proxima.setHours(0,0,0,0);
+    const diff = Math.ceil((proxima - hoy) / (1000*60*60*24));
+    if (diff <= 0) return '⚠️ Vencida';
+    if (diff === 1) return 'Próxima: mañana';
+    return `Próxima: en ${diff} días`;
+  } catch(e) { return ''; }
+}
+
+async function guardarRecurrentes() {
+  try {
+    await fetch(APPS_SCRIPT_URL, {
+      method:'POST', mode:'no-cors',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ action:'setRecurrentes', recurrentes })
+    });
+    return true;
+  } catch(e) { return false; }
+}
+
+function mostrarStatusRec(msg, tipo) {
+  const el = document.getElementById('statusRec');
+  el.textContent = msg; el.className = `status-msg ${tipo}`;
+  setTimeout(()=>{ el.className='status-msg'; }, 3000);
+}
+
+async function agregarRecurrente() {
+  const tarea     = document.getElementById('rTarea').value.trim();
+  const nota      = document.getElementById('rNota').value.trim();
+  const intervalo = parseInt(document.getElementById('rIntervalo').value);
+  const inicio    = document.getElementById('rInicio').value;
+
+  if (!tarea)          { mostrarStatusRec('Escribe el nombre de la tarea', 'err'); return; }
+  if (!intervalo || intervalo < 1) { mostrarStatusRec('Define el intervalo en días', 'err'); return; }
+  if (!inicio)         { mostrarStatusRec('Define la fecha de inicio', 'err'); return; }
+
+  recurrentes.push({ tarea, nota, intervalo, inicio, ultimaComp: '' });
+  renderRecurrentes();
+  document.getElementById('rTarea').value = '';
+  document.getElementById('rNota').value = '';
+  document.getElementById('rIntervalo').value = '';
+  document.getElementById('rInicio').value = '';
+
+  const ok = await guardarRecurrentes();
+  mostrarStatusRec(ok ? '✓ Tarea recurrente guardada' : '⚠ Error al guardar', ok?'ok':'err');
+}
+
+function eliminarRecurrente(i) {
+  if (!confirm(`¿Eliminar tarea recurrente: "${recurrentes[i].tarea}"?`)) return;
+  recurrentes.splice(i,1);
+  renderRecurrentes();
+  guardarRecurrentes().then(ok => mostrarStatusRec(ok?'✓ Eliminada':'⚠ Error al guardar', ok?'ok':'err'));
+}
+
+// Establecer fecha de hoy como default en el campo inicio
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('rInicio').value = new Date().toISOString().split('T')[0];
+});
+
+// ── DISPOSITIVOS ────────────────────────────────────────
+let dispositivos = [];
+
+async function cargarDispositivos() {
+  document.getElementById('dispositivosList').innerHTML = '<div class="p-empty">Cargando...</div>';
+  try {
+    const r = await fetch(`${APPS_SCRIPT_URL}?action=getDispositivos`);
+    const d = await r.json();
+    dispositivos = Array.isArray(d) ? d : [];
+    renderDispositivos();
+  } catch(e) {
+    document.getElementById('dispositivosList').innerHTML = '<div class="p-empty" style="color:#ff8080">Error al cargar.</div>';
+  }
+}
+
+function renderDispositivos() {
+  const el = document.getElementById('dispositivosList');
+  if (dispositivos.length === 0) {
+    el.innerHTML = '<div class="p-empty">Sin dispositivos autorizados</div>'; return;
+  }
+  el.innerHTML = dispositivos.map((d, i) => `
+    <div class="p-item">
+      <span style="font-size:15px;flex-shrink:0">📱</span>
+      <div class="p-item-text">
+        <div>${d.nombre}</div>
+        <div class="p-item-nota" style="font-family:monospace;letter-spacing:0.08em">${d.deviceId}</div>
+      </div>
+      <button class="p-item-del" onclick="eliminarDispositivo(${i})" title="Eliminar">✕</button>
+    </div>`).join('');
+}
+
+async function guardarDispositivos() {
+  try {
+    await fetch(APPS_SCRIPT_URL, {
+      method:'POST', mode:'no-cors',
+      headers:{'Content-Type':'text/plain'},
+      body: JSON.stringify({ action:'setDispositivos', dispositivos })
+    });
+    return true;
+  } catch(e) { return false; }
+}
+
+function mostrarStatusDev(msg, tipo) {
+  const el = document.getElementById('statusDev');
+  el.textContent = msg; el.className = `status-msg ${tipo}`;
+  setTimeout(()=>{ el.className='status-msg'; }, 3000);
+}
+
+async function agregarDispositivo() {
+  const nombre   = document.getElementById('dNombre').value.trim();
+  const deviceId = document.getElementById('dDeviceId').value.trim().toUpperCase();
+  if (!nombre)   { mostrarStatusDev('Escribe un nombre', 'err'); return; }
+  if (!deviceId) { mostrarStatusDev('Escribe el Device ID', 'err'); return; }
+  dispositivos.push({ nombre, deviceId });
+  renderDispositivos();
+  document.getElementById('dNombre').value = '';
+  document.getElementById('dDeviceId').value = '';
+  const ok = await guardarDispositivos();
+  mostrarStatusDev(ok ? '✓ Dispositivo guardado' : '⚠ Error al guardar', ok?'ok':'err');
+}
+
+function eliminarDispositivo(i) {
+  if (!confirm(`¿Eliminar dispositivo: "${dispositivos[i].nombre}"?`)) return;
+  dispositivos.splice(i,1);
+  renderDispositivos();
+  guardarDispositivos().then(ok => mostrarStatusDev(ok?'✓ Eliminado':'⚠ Error',ok?'ok':'err'));
+}
+
+</script>
+</body>
+</html>

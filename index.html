@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Registro de Asistencia</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;600&display=swap');
+  :root { --bg:#0a0a0a; --surface:#141414; --border:#2a2a2a; --accent-in:#00e676; --accent-out:#ff6b35; --accent:var(--accent-in); --text:#f0f0f0; --muted:#666; --error:#ff4444; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--bg); color:var(--text); font-family:'IBM Plex Sans',sans-serif; min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px; }
+  body::before { content:''; position:fixed; inset:0; background:radial-gradient(ellipse 60% 50% at 50% 0%,rgba(0,230,118,0.06) 0%,transparent 70%); pointer-events:none; transition:background 0.5s; }
+  body.salida::before { background:radial-gradient(ellipse 60% 50% at 50% 0%,rgba(255,107,53,0.06) 0%,transparent 70%); }
+  .card { width:100%; max-width:400px; background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:32px 26px; position:relative; }
+  .card::before { content:''; position:absolute; top:0;left:0;right:0; height:2px; background:var(--accent); transition:background 0.5s; border-radius:16px 16px 0 0; }
+  .tipo-badge { display:inline-flex; align-items:center; gap:8px; font-family:'IBM Plex Mono',monospace; font-size:11px; font-weight:600; letter-spacing:0.15em; color:var(--accent); margin-bottom:20px; padding:5px 10px; border:1px solid currentColor; border-radius:4px; }
+  .tipo-badge .dot { width:6px;height:6px;border-radius:50%;background:currentColor;animation:pulse 2s infinite; }
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+  .clock { font-family:'IBM Plex Mono',monospace; font-size:32px; font-weight:600; color:var(--accent); letter-spacing:-1px; margin-bottom:2px; }
+  .date-label { font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--muted); margin-bottom:24px; text-transform:capitalize; }
+  h1 { font-size:22px; font-weight:600; line-height:1.2; margin-bottom:4px; }
+  .subtitle { color:var(--muted); font-size:13px; margin-bottom:24px; }
+
+  /* Pasos */
+  .steps { display:flex; flex-direction:column; gap:10px; margin-bottom:16px; }
+  .step { display:flex; align-items:center; gap:12px; padding:11px 13px; border-radius:8px; border:1px solid var(--border); background:var(--bg); font-size:13px; transition:all 0.3s; }
+  .step.active { border-color:var(--accent); background:rgba(0,230,118,0.04); }
+  body.salida .step.active { background:rgba(255,107,53,0.04); }
+  .step.done { border-color:rgba(0,230,118,0.3); opacity:0.7; }
+  .step.failed { border-color:rgba(255,68,68,0.4); background:rgba(255,68,68,0.04); }
+  .step-icon { font-size:15px; width:20px; text-align:center; flex-shrink:0; }
+  .step-text { flex:1; }
+  .step-status { font-family:'IBM Plex Mono',monospace; font-size:10px; color:var(--muted); }
+  .step.active .step-status { color:var(--accent); }
+  .step.failed .step-status { color:var(--error); }
+  .spinner { width:14px;height:14px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.7s linear infinite;flex-shrink:0; }
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .btn-skip { width:100%; padding:10px; border-radius:8px; border:1px solid var(--border); background:transparent; color:var(--muted); font-family:'IBM Plex Sans',sans-serif; font-size:13px; cursor:pointer; margin-bottom:8px; transition:all 0.2s; animation:fadeIn 0.4s ease; }
+  .btn-skip:hover { border-color:var(--accent); color:var(--accent); }
+
+  /* Pendientes entrada */
+  .pendientes-section { display:none; flex-direction:column; gap:14px; animation:fadeIn 0.3s ease; }
+  .pendientes-section.visible { display:flex; }
+  .section-header { font-size:12px; color:var(--muted); font-family:'IBM Plex Mono',monospace; letter-spacing:0.1em; text-transform:uppercase; }
+  .pendiente-item { display:flex; align-items:flex-start; gap:12px; padding:12px 13px; border-radius:8px; border:1px solid var(--border); background:var(--bg); font-size:13px; line-height:1.4; }
+  .pi-icon { font-size:15px; flex-shrink:0; margin-top:1px; }
+  .pi-nota { font-size:11px; color:var(--muted); margin-top:2px; }
+
+  /* Checklist salida */
+  .checklist-section { display:none; flex-direction:column; gap:14px; animation:fadeIn 0.3s ease; }
+  .checklist-section.visible { display:flex; }
+  .checklist-sub { font-size:12px; color:var(--muted); margin-top:-8px; }
+  .check-item { display:flex; align-items:flex-start; gap:12px; padding:12px 13px; border-radius:8px; border:1px solid var(--border); background:var(--bg); cursor:pointer; transition:all 0.2s; user-select:none; }
+  .check-item:hover { border-color:var(--accent); }
+  .check-item.checked { border-color:rgba(0,230,118,0.4); background:rgba(0,230,118,0.04); }
+  body.salida .check-item.checked { border-color:rgba(255,107,53,0.4); background:rgba(255,107,53,0.04); }
+  .check-box { width:20px;height:20px;border-radius:5px;border:2px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;transition:all 0.2s;margin-top:1px; }
+  .check-item.checked .check-box { background:var(--accent); border-color:var(--accent); color:#000; }
+  body.salida .check-item.checked .check-box { background:var(--accent-out); border-color:var(--accent-out); }
+  .check-text { flex:1; font-size:13px; line-height:1.4; }
+  .check-item.checked .check-text { text-decoration:line-through; opacity:0.5; }
+  .check-nota { font-size:11px; color:var(--muted); margin-top:2px; }
+  .checklist-progress { font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--muted); text-align:right; }
+
+  /* PIN */
+  .pin-section { display:none; flex-direction:column; gap:14px; animation:fadeIn 0.3s ease; }
+  .pin-section.visible { display:flex; }
+  .pin-label { font-size:12px; color:var(--muted); font-family:'IBM Plex Mono',monospace; letter-spacing:0.08em; }
+  .pin-input { width:100%; background:var(--bg); border:1px solid var(--border); border-radius:8px; color:var(--text); font-family:'IBM Plex Mono',monospace; font-size:28px; font-weight:600; letter-spacing:0.3em; text-align:center; padding:14px; outline:none; transition:border-color 0.2s; -webkit-text-security:disc; }
+  .pin-input:focus { border-color:var(--accent); }
+  .pin-hint { font-size:11px; color:var(--muted); text-align:center; }
+
+  /* Botón */
+  .btn { width:100%; padding:14px; border-radius:8px; border:none; font-family:'IBM Plex Sans',sans-serif; font-size:14px; font-weight:600; cursor:pointer; background:var(--accent); color:#000; letter-spacing:0.05em; transition:all 0.2s; }
+  .btn:hover { filter:brightness(1.1); }
+  .btn:active { transform:scale(0.98); }
+  .btn:disabled { opacity:0.4; cursor:not-allowed; }
+
+  /* Resultado */
+  .result { display:none; flex-direction:column; align-items:center; text-align:center; gap:10px; padding:16px 0 6px; animation:fadeIn 0.4s ease; }
+  .result.visible { display:flex; }
+  .result-icon { font-size:48px; line-height:1; }
+  .result-title { font-size:22px; font-weight:600; }
+  .result-time { font-family:'IBM Plex Mono',monospace; font-size:13px; color:var(--muted); }
+  .result-method { font-size:11px; color:var(--muted); padding:4px 10px; border:1px solid var(--border); border-radius:20px; font-family:'IBM Plex Mono',monospace; }
+  .device-id-tag { display:none; font-family:'IBM Plex Mono',monospace; font-size:10px; color:var(--muted); padding:3px 8px; border:1px solid var(--border); border-radius:20px; }
+  .device-id-tag.visible { display:inline-block; }
+
+  /* Ya registrado */
+  .ya-registrado { display:none; flex-direction:column; align-items:center; text-align:center; gap:12px; padding:10px 0; animation:fadeIn 0.4s ease; }
+  .ya-registrado.visible { display:flex; }
+  .ya-reg-icon { font-size:46px; }
+  .ya-reg-title { font-size:20px; font-weight:600; }
+  .ya-reg-msg { font-size:13px; color:var(--muted); line-height:1.6; }
+  .ya-reg-time { font-family:'IBM Plex Mono',monospace; font-size:13px; padding:7px 14px; border:1px solid var(--border); border-radius:20px; }
+  .ya-reg-expira { font-size:11px; color:var(--muted); font-family:'IBM Plex Mono',monospace; }
+
+  /* Bloqueado */
+  .device-blocked { display:none; flex-direction:column; align-items:center; text-align:center; gap:14px; padding:10px 0; animation:fadeIn 0.4s ease; }
+  .device-blocked.visible { display:flex; }
+  .blocked-icon { font-size:46px; }
+  .blocked-title { font-size:20px; font-weight:600; color:#ff8080; }
+  .blocked-msg { font-size:13px; color:var(--muted); line-height:1.6; }
+  .blocked-id-box { width:100%; background:var(--bg); border:1px solid rgba(255,68,68,0.3); border-radius:8px; padding:14px; display:flex; flex-direction:column; gap:6px; }
+  .blocked-id-label { font-size:10px; color:var(--muted); font-family:'IBM Plex Mono',monospace; letter-spacing:0.12em; text-transform:uppercase; }
+  .blocked-id-value { font-family:'IBM Plex Mono',monospace; font-size:24px; font-weight:700; color:#ff8080; letter-spacing:0.15em; }
+  .blocked-id-hint { font-size:11px; color:var(--muted); line-height:1.5; }
+
+  /* Error */
+  .error-msg { display:none; background:rgba(255,68,68,0.08); border:1px solid rgba(255,68,68,0.3); border-radius:8px; padding:11px 13px; font-size:13px; color:#ff8080; text-align:center; animation:fadeIn 0.3s ease; }
+  .error-msg.visible { display:block; }
+
+  @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+  body.salida { --accent:var(--accent-out); }
+  body.salida .step.done { border-color:rgba(255,107,53,0.3); }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="tipo-badge"><span class="dot"></span><span id="tipoLabel">ENTRADA</span></div>
+  <div class="clock" id="clock">--:--:--</div>
+  <div class="date-label" id="dateLabel">cargando...</div>
+  <h1 id="mainTitle">Registro de<br>Asistencia</h1>
+  <p class="subtitle" id="mainSubtitle">Verificando tu ubicación automáticamente</p>
+
+  <!-- Ya registrado -->
+  <div class="ya-registrado" id="yaRegistrado">
+    <div class="ya-reg-icon">⏱</div>
+    <div class="ya-reg-title" id="yaRegTitle"></div>
+    <div class="ya-reg-msg">Ya realizaste este registro recientemente.</div>
+    <div class="ya-reg-time" id="yaRegTime"></div>
+    <div class="ya-reg-expira" id="yaRegExpira"></div>
+  </div>
+
+  <!-- Bloqueado -->
+  <div class="device-blocked" id="deviceBlocked">
+    <div class="blocked-icon">🚫</div>
+    <div class="blocked-title">Dispositivo no autorizado</div>
+    <div class="blocked-msg">Este equipo no tiene permiso para registrar asistencia. Proporciona el siguiente código a la administración.</div>
+    <div class="blocked-id-box">
+      <div class="blocked-id-label">Tu Device ID</div>
+      <div class="blocked-id-value" id="blockedIdValue">--------</div>
+      <div class="blocked-id-hint">Comparte este código con el administrador para autorizar tu dispositivo.</div>
+    </div>
+  </div>
+
+  <!-- Pasos GPS -->
+  <div class="steps" id="stepsSection">
+    <div class="step active" id="stepGps">
+      <div class="spinner" id="gpsSpinner"></div>
+      <span class="step-text">Verificando ubicación GPS</span>
+      <span class="step-status" id="gpsStatus">buscando...</span>
+    </div>
+    <div class="step" id="stepReg">
+      <span class="step-icon">📡</span>
+      <span class="step-text">Enviando registro</span>
+      <span class="step-status" id="regStatus">esperando</span>
+    </div>
+  </div>
+  <button class="btn-skip" id="btnSkip" onclick="saltarAPin()" style="display:none">¿GPS tardando? Usar PIN →</button>
+
+  <!-- Pendientes entrada -->
+  <div class="pendientes-section" id="pendientesSection">
+    <div class="section-header">📋 Pendientes del día</div>
+    <div id="pendientesList"></div>
+    <button class="btn" id="btnEntrada" onclick="confirmarEntrada()">Confirmar entrada</button>
+  </div>
+
+  <!-- PIN -->
+  <div class="pin-section" id="pinSection">
+    <div class="pin-label">PIN DE ACCESO</div>
+    <input type="tel" class="pin-input" id="pinInput" maxlength="6" placeholder="······" autocomplete="off">
+    <div class="pin-hint">Solicita el PIN actual al encargado</div>
+    <div class="error-msg" id="pinError">PIN incorrecto. Inténtalo de nuevo.</div>
+    <button class="btn" id="pinBtn" onclick="verificarPin()">Confirmar registro</button>
+  </div>
+
+  <!-- Checklist salida -->
+  <div class="checklist-section" id="checklistSection">
+    <div class="section-header">✅ Confirma tus pendientes</div>
+    <div class="checklist-sub">Palomea los que completaste hoy</div>
+    <div id="checklistList"></div>
+    <div class="checklist-progress" id="checklistProgress"></div>
+    <button class="btn" id="btnSalida" onclick="confirmarSalida()">Registrar salida</button>
+  </div>
+
+  <!-- Resultado -->
+  <div class="result" id="resultSection">
+    <div class="result-icon" id="resultIcon">✅</div>
+    <div class="result-title" id="resultTitle"></div>
+    <div class="result-time" id="resultTime"></div>
+    <div class="result-method" id="resultMethod"></div>
+    <div class="device-id-tag" id="deviceIdTag"></div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+// CONFIGURACIÓN — EDITA ESTOS VALORES
+// ═══════════════════════════════════════════════════════
+const CONFIG = {
+  LAT: 25.7420771,
+  LNG: -100.4066984,
+  RADIO: 200,
+  PIN_SECRET: "MyRevival2024",
+  PIN_INTERVALO: 10,
+  APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbwmgeUQkyN8XWS_8Nn2RWlAqocx9MmrDagmo33KrbZ4CO2yKWzzd-d5q5LEp6EdlOOkpA/exec",
+  DEVICES_AUTORIZADOS: [
+    "2394215D",  // Tu celular
+    "480CE7F7",  // Celular del empleado
+    "54CEB96F"   // Tu laptop
+  ]
+};
+// ═══════════════════════════════════════════════════════
+
+const params = new URLSearchParams(window.location.search);
+const TIPO = (params.get('tipo') || 'entrada').toLowerCase() === 'salida' ? 'SALIDA' : 'ENTRADA';
+if (TIPO === 'SALIDA') {
+  document.body.classList.add('salida');
+  document.getElementById('tipoLabel').textContent = 'SALIDA';
+  document.getElementById('mainTitle').innerHTML = 'Registro de<br>Salida';
+}
+
+// Reloj
+function actualizarReloj() {
+  const n = new Date();
+  document.getElementById('clock').textContent = n.toLocaleTimeString('es-MX',{hour12:false});
+  document.getElementById('dateLabel').textContent = n.toLocaleDateString('es-MX',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+}
+actualizarReloj(); setInterval(actualizarReloj, 1000);
+
+// PIN
+function calcularPIN() {
+  const n = new Date(), v = Math.floor((n.getHours()*60+n.getMinutes())/CONFIG.PIN_INTERVALO);
+  const s = `${CONFIG.PIN_SECRET}-${n.toDateString()}-${v}`;
+  let h = 0; for (let i=0;i<s.length;i++){h=((h<<5)-h)+s.charCodeAt(i);h|=0;}
+  return String(Math.abs(h)%1000000).padStart(6,'0');
+}
+
+// GPS
+function distancia(la1,ln1,la2,ln2) {
+  const R=6371000,dL=(la2-la1)*Math.PI/180,dN=(ln2-ln1)*Math.PI/180;
+  const a=Math.sin(dL/2)**2+Math.cos(la1*Math.PI/180)*Math.cos(la2*Math.PI/180)*Math.sin(dN/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+
+// Fingerprint con solo datos estables del dispositivo
+function generarFingerprint() {
+  const pantalla  = `${screen.width}x${screen.height}`;
+  const zona      = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+  const idioma    = navigator.language || '';
+  const semilla   = `${pantalla}|${zona}|${idioma}`;
+  let hash = 0;
+  for (let i = 0; i < semilla.length; i++) {
+    hash = ((hash << 5) - hash) + semilla.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash).toString(16).toUpperCase().padStart(8, '0');
+}
+
+function detectarDispositivo() {
+  const ua=navigator.userAgent; let os='?',tipo='Web';
+  if(/iPhone/.test(ua))os='iPhone'; else if(/iPad/.test(ua))os='iPad';
+  else if(/Android/.test(ua)){const m=ua.match(/Android[\s/]([\d.]+)/);os=`Android ${m?m[1]:''}`.trim();}
+  else if(/Windows/.test(ua))os='Windows'; else if(/Mac/.test(ua))os='Mac';
+  if(/CriOS/.test(ua))tipo='Chrome iOS'; else if(/Safari/.test(ua)&&!/Chrome/.test(ua))tipo='Safari'; else if(/Chrome/.test(ua))tipo='Chrome';
+  const im=ua.match(/OS ([\d_]+) like/);
+  return `${os}${im?' iOS '+im[1].replace(/_/g,'.'):''}/${tipo}/${navigator.language}`;
+}
+
+// ── DUPLICADOS ──────────────────────────────────────────
+const LS_KEY = `asistencia_${TIPO}`;
+function guardarLocal() { try{localStorage.setItem(LS_KEY,Date.now().toString());}catch(e){} }
+function verificarDuplicado() {
+  try {
+    const g=localStorage.getItem(LS_KEY); if(!g)return null;
+    const ts=parseInt(g), diff=Date.now()-ts;
+    if(diff/3600000 < 6) return {ts, mins: Math.ceil(6*60-diff/60000)};
+    localStorage.removeItem(LS_KEY); return null;
+  } catch(e){return null;}
+}
+function mostrarYaRegistrado(ts, mins) {
+  ocultarTodo(); document.getElementById('yaRegistrado').classList.add('visible');
+  document.getElementById('yaRegTitle').textContent = `Ya registraste tu ${TIPO==='ENTRADA'?'entrada':'salida'}`;
+  document.getElementById('yaRegTime').textContent = `Registrado a las ${new Date(ts).toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit',hour12:true})}`;
+  const h=Math.floor(mins/60),m=mins%60;
+  document.getElementById('yaRegExpira').textContent = h>0?`Disponible en ${h}h ${m}m`:`Disponible en ${m} minutos`;
+}
+
+// ── PENDIENTES ──────────────────────────────────────────
+let pendientesActivos = [];
+
+async function cargarPendientes() {
+  try {
+    const r = await fetch(`${CONFIG.APPS_SCRIPT_URL}?action=getPendientes`);
+    const d = await r.json();
+    return Array.isArray(d) ? d : [];
+  } catch(e) { return []; }
+}
+
+function mostrarPendientesEntrada(lista) {
+  ocultarTodo();
+  document.getElementById('pendientesSection').classList.add('visible');
+  const el = document.getElementById('pendientesList');
+  if (lista.length === 0) {
+    el.innerHTML = '<div style="font-size:13px;color:var(--muted);text-align:center;padding:12px 0">Sin pendientes por hoy ✓</div>';
+  } else {
+    el.innerHTML = lista.map(p=>`
+      <div class="pendiente-item" style="margin-bottom:8px">
+        <span class="pi-icon">📌</span>
+        <div><div>${p.tarea}</div>${p.nota?`<div class="pi-nota">${p.nota}</div>`:''}</div>
+      </div>`).join('');
+  }
+}
+
+function mostrarChecklistSalida(lista) {
+  ocultarTodo();
+  document.getElementById('checklistSection').classList.add('visible');
+  const el = document.getElementById('checklistList');
+  if (lista.length === 0) {
+    el.innerHTML = '<div style="font-size:13px;color:var(--muted);text-align:center;padding:12px 0">No había pendientes registrados hoy</div>';
+    actualizarProgreso(0,0); return;
+  }
+  lista.forEach((p,i) => {
+    const div = document.createElement('div');
+    div.className = 'check-item'; div.dataset.i = i;
+    div.style.marginBottom = '8px';
+    div.innerHTML = `<div class="check-box"></div><div class="check-text"><div>${p.tarea}</div>${p.nota?`<div class="check-nota">${p.nota}</div>`:''}</div>`;
+    div.onclick = () => {
+      div.classList.toggle('checked');
+      div.querySelector('.check-box').textContent = div.classList.contains('checked') ? '✓' : '';
+      actualizarProgreso(document.querySelectorAll('.check-item.checked').length, lista.length);
+    };
+    el.appendChild(div);
+  });
+  actualizarProgreso(0, lista.length);
+}
+
+function actualizarProgreso(c,t) {
+  document.getElementById('checklistProgress').textContent = t>0?`${c} de ${t} completados`:'';
+}
+
+// ── ENVÍO ───────────────────────────────────────────────
+const DEVICE_ID = generarFingerprint();
+let metodoV = 'GPS', coordsV = {lat:null,lng:null,acc:null};
+
+async function enviarRegistro(resultadosPendientes) {
+  const n = new Date();
+  const completados = resultadosPendientes ? resultadosPendientes.filter(r=>r.completado).map(r=>r.tarea).join(' | ') : '';
+  const noCompletados = resultadosPendientes ? resultadosPendientes.filter(r=>!r.completado).map(r=>r.tarea).join(' | ') : '';
+  const datos = {
+    tipo: TIPO, fecha: n.toLocaleDateString('es-MX'),
+    hora: n.toLocaleTimeString('es-MX',{hour12:false}),
+    metodo: metodoV, lat: coordsV.lat||'', lng: coordsV.lng||'',
+    precision: coordsV.acc ? `${Math.round(coordsV.acc)}m` : 'N/A',
+    deviceId: DEVICE_ID, dispositivo: detectarDispositivo(),
+    zona: Intl.DateTimeFormat().resolvedOptions().timeZone||'',
+    pantalla: `${screen.width}x${screen.height}`, autorizado:'SI',
+    completados, noCompletados
+  };
+  try {
+    const blob = new Blob([JSON.stringify(datos)], {type:'text/plain'});
+    await fetch(CONFIG.APPS_SCRIPT_URL, {
+      method:'POST', mode:'no-cors',
+      body: blob
+    });
+  } catch(e){ console.warn('Sheets error:',e); }
+}
+
+// ── UI ──────────────────────────────────────────────────
+function ocultarTodo() {
+  ['stepsSection','pinSection','pendientesSection','checklistSection','resultSection','yaRegistrado','deviceBlocked'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el) { el.style.display=''; el.classList.remove('visible'); }
+  });
+  document.getElementById('stepsSection').style.display = 'none';
+  document.getElementById('btnSkip').style.display = 'none';
+}
+
+function mostrarExito() {
+  guardarLocal(); ocultarTodo();
+  document.getElementById('resultSection').classList.add('visible');
+  const n = new Date();
+  document.getElementById('resultIcon').textContent = TIPO==='ENTRADA'?'✅':'🏁';
+  document.getElementById('resultTitle').textContent = TIPO==='ENTRADA'?'¡Entrada registrada!':'¡Salida registrada!';
+  document.getElementById('resultTime').textContent = n.toLocaleTimeString('es-MX',{hour12:true,hour:'2-digit',minute:'2-digit'});
+  document.getElementById('resultMethod').textContent = metodoV==='GPS'?'📍 Verificado por ubicación':'🔐 Verificado por PIN';
+  const tag = document.getElementById('deviceIdTag');
+  tag.textContent = `🖥 ID: ${DEVICE_ID}`; tag.classList.add('visible');
+}
+
+function mostrarPinFallback(razon) {
+  const sg = document.getElementById('stepGps');
+  sg.classList.remove('active'); sg.classList.add('failed');
+  document.getElementById('gpsSpinner').style.display='none';
+  if(!sg.querySelector('.step-icon')) sg.insertAdjacentHTML('afterbegin','<span class="step-icon">⚠️</span>');
+  document.getElementById('gpsStatus').textContent = razon;
+  document.getElementById('mainSubtitle').textContent = 'Ingresa el PIN proporcionado por el encargado';
+  document.getElementById('pinSection').classList.add('visible');
+  setTimeout(()=>document.getElementById('pinInput').focus(),300);
+}
+
+// ── CONFIRMACIONES ──────────────────────────────────────
+async function procesoVerificado(metodo, lat, lng, acc) {
+  metodoV = metodo; coordsV = {lat,lng,acc};
+  document.getElementById('stepsSection').style.display = 'none';
+  const pendientes = await cargarPendientes();
+  pendientesActivos = pendientes;
+  if (TIPO === 'ENTRADA') {
+    mostrarPendientesEntrada(pendientes);
+  } else {
+    mostrarChecklistSalida(pendientes);
+  }
+}
+
+async function confirmarEntrada() {
+  const btn = document.getElementById('btnEntrada');
+  btn.disabled=true; btn.textContent='Registrando...';
+  await enviarRegistro(null);
+  mostrarExito();
+}
+
+async function confirmarSalida() {
+  const btn = document.getElementById('btnSalida');
+  btn.disabled=true; btn.textContent='Registrando...';
+  const items = document.querySelectorAll('.check-item');
+  const resultados = Array.from(items).map(el=>({
+    tarea: pendientesActivos[parseInt(el.dataset.i)]?.tarea||'',
+    completado: el.classList.contains('checked')
+  }));
+  await enviarRegistro(resultados);
+
+  // Borrar pendientes completados via GET (evita problema de no-cors con body)
+  const completados = resultados.filter(r=>r.completado).map(r=>r.tarea);
+  if (completados.length > 0) {
+    try {
+      const tareas = encodeURIComponent(completados.join('|'));
+      await fetch(`${CONFIG.APPS_SCRIPT_URL}?action=completarPendientes&tareas=${tareas}`);
+    } catch(e){ console.warn('Error borrando pendientes:', e); }
+  }
+
+  mostrarExito();
+}
+
+// ── GPS ─────────────────────────────────────────────────
+let gpsResuelto=false, gpsTimeoutId=null;
+
+function saltarAPin() {
+  if(gpsResuelto)return; gpsResuelto=true;
+  clearTimeout(gpsTimeoutId); mostrarPinFallback('omitido manualmente');
+}
+
+function intentarGPS() {
+  if(!navigator.geolocation){mostrarPinFallback('no disponible');return;}
+  setTimeout(()=>{if(!gpsResuelto)document.getElementById('btnSkip').style.display='block';},4000);
+  gpsTimeoutId = setTimeout(()=>{if(!gpsResuelto){gpsResuelto=true;mostrarPinFallback('tiempo agotado');}},8000);
+  navigator.geolocation.getCurrentPosition(
+    async(pos)=>{
+      if(gpsResuelto)return; gpsResuelto=true; clearTimeout(gpsTimeoutId);
+      document.getElementById('btnSkip').style.display='none';
+      const{latitude:la,longitude:lo,accuracy:ac}=pos.coords;
+      const dist=distancia(CONFIG.LAT,CONFIG.LNG,la,lo);
+      if(dist<=CONFIG.RADIO){
+        const sg=document.getElementById('stepGps');
+        sg.classList.remove('active');sg.classList.add('done');
+        document.getElementById('gpsSpinner').style.display='none';
+        document.getElementById('gpsStatus').textContent=`✓ ${Math.round(dist)}m`;
+        await procesoVerificado('GPS',la,lo,ac);
+      } else {
+        mostrarPinFallback(`fuera de rango (${Math.round(dist)}m)`);
+      }
+    },
+    (err)=>{
+      if(gpsResuelto)return; gpsResuelto=true; clearTimeout(gpsTimeoutId);
+      document.getElementById('btnSkip').style.display='none';
+      const r={1:'permiso denegado',2:'señal no disponible',3:'tiempo agotado'};
+      mostrarPinFallback(r[err.code]||'error');
+    },
+    {timeout:10000,maximumAge:30000,enableHighAccuracy:true}
+  );
+}
+
+// ── PIN ─────────────────────────────────────────────────
+async function verificarPin() {
+  const pin=document.getElementById('pinInput').value.trim();
+  const err=document.getElementById('pinError');
+  const btn=document.getElementById('pinBtn');
+  if(pin===calcularPIN()){
+    err.classList.remove('visible'); btn.disabled=true; btn.textContent='Verificando...';
+    document.getElementById('pinSection').classList.remove('visible');
+    await procesoVerificado('PIN',null,null,null);
+  } else {
+    err.classList.add('visible');
+    document.getElementById('pinInput').value='';
+    document.getElementById('pinInput').focus();
+  }
+}
+document.getElementById('pinInput').addEventListener('keydown',e=>{if(e.key==='Enter')verificarPin();});
+
+// ── ARRANQUE ────────────────────────────────────────────
+if(!CONFIG.DEVICES_AUTORIZADOS.includes(DEVICE_ID)){
+  document.getElementById('stepsSection').style.display='none';
+  document.getElementById('deviceBlocked').classList.add('visible');
+  document.getElementById('blockedIdValue').textContent=DEVICE_ID;
+} else {
+  const dup=verificarDuplicado();
+  if(dup) mostrarYaRegistrado(dup.ts,dup.mins);
+  else intentarGPS();
+}
+</script>
+</body>
+</html>

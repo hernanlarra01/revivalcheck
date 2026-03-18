@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PIN — Revival 136</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@300;400;600&display=swap');
+
+  :root { --bg:#0a0a0a; --surface:#141414; --border:#2a2a2a; --accent:#f5c518; --accent2:#00e676; --text:#f0f0f0; --muted:#555; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    background:var(--bg); color:var(--text);
+    font-family:'IBM Plex Sans',sans-serif;
+    min-height:100vh; display:flex;
+    align-items:center; justify-content:center;
+    padding:32px;
+  }
+  body::before {
+    content:''; position:fixed; inset:0;
+    background:radial-gradient(ellipse 60% 50% at 50% 0%,rgba(245,197,24,0.05) 0%,transparent 70%);
+    pointer-events:none;
+  }
+
+  /* Bloqueado */
+  .blocked {
+    display:none; flex-direction:column;
+    align-items:center; text-align:center; gap:16px;
+  }
+  .blocked.visible { display:flex; }
+  .blocked-icon { font-size:56px; }
+  .blocked-title { font-size:22px; font-weight:600; color:#ff8080; }
+  .blocked-msg { font-size:14px; color:var(--muted); max-width:300px; line-height:1.6; }
+
+  /* Panel principal */
+  .panel {
+    display:none; width:100%; max-width:500px;
+    flex-direction:column; gap:24px;
+  }
+  .panel.visible { display:flex; }
+
+  .card {
+    background:var(--surface); border:1px solid var(--border);
+    border-radius:20px; padding:32px 28px; position:relative;
+  }
+  .card::before {
+    content:''; position:absolute; top:0;left:0;right:0;
+    height:2px; background:var(--accent); border-radius:20px 20px 0 0;
+  }
+  .card.green::before { background:var(--accent2); }
+
+  /* PIN */
+  .badge {
+    display:inline-flex; align-items:center; gap:8px;
+    font-family:'IBM Plex Mono',monospace; font-size:10px;
+    font-weight:600; letter-spacing:0.18em; text-transform:uppercase;
+    color:var(--accent); padding:5px 10px;
+    border:1px solid currentColor; border-radius:4px; margin-bottom:20px;
+  }
+  .badge .dot { width:5px;height:5px;border-radius:50%;background:currentColor;animation:pulse 1.5s infinite; }
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.2}}
+
+  .pin-display {
+    font-family:'IBM Plex Mono',monospace;
+    font-size:72px; font-weight:700;
+    letter-spacing:0.25em; color:var(--accent);
+    line-height:1; margin-bottom:20px;
+    text-shadow:0 0 60px rgba(245,197,24,0.3);
+  }
+
+  .timer-row { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
+  .timer-label { font-size:11px; color:var(--muted); font-family:'IBM Plex Mono',monospace; letter-spacing:0.05em; }
+  .timer-cd { font-family:'IBM Plex Mono',monospace; font-size:14px; font-weight:600; }
+  .progress-bar { height:3px; background:var(--border); border-radius:2px; overflow:hidden; margin-bottom:24px; }
+  .progress-fill { height:100%; background:var(--accent); border-radius:2px; transition:width 1s linear; }
+
+  .clock-row { display:flex; justify-content:space-between; align-items:flex-end; padding-top:20px; border-top:1px solid var(--border); }
+  .clock-now { font-family:'IBM Plex Mono',monospace; font-size:28px; font-weight:600; }
+  .clock-date { font-size:12px; color:var(--muted); text-align:right; text-transform:capitalize; line-height:1.6; }
+
+  /* Pendientes */
+  .badge2 {
+    display:inline-flex; align-items:center; gap:8px;
+    font-family:'IBM Plex Mono',monospace; font-size:10px;
+    font-weight:600; letter-spacing:0.18em; text-transform:uppercase;
+    color:var(--accent2); padding:5px 10px;
+    border:1px solid currentColor; border-radius:4px; margin-bottom:20px;
+  }
+  .badge2 .dot { width:5px;height:5px;border-radius:50%;background:currentColor;animation:pulse 1.5s infinite; }
+
+  .p-list { display:flex; flex-direction:column; gap:10px; }
+  .p-item {
+    display:flex; align-items:flex-start; gap:12px;
+    padding:14px 16px; border-radius:10px;
+    border:1px solid var(--border); background:var(--bg);
+    font-size:14px; line-height:1.4;
+  }
+  .p-icon { font-size:16px; flex-shrink:0; margin-top:1px; }
+  .p-nota { font-size:12px; color:var(--muted); margin-top:3px; }
+  .p-empty { font-size:14px; color:var(--muted); text-align:center; padding:20px 0; }
+
+  @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+</style>
+</head>
+<body>
+
+<!-- Bloqueado -->
+<div class="blocked" id="blockedPanel">
+  <div class="blocked-icon">🔒</div>
+  <div class="blocked-title">Dispositivo no autorizado</div>
+  <div class="blocked-msg">Esta pantalla solo puede verse desde la tablet autorizada.</div>
+</div>
+
+<!-- Panel principal -->
+<div class="panel" id="mainPanel">
+
+  <!-- PIN -->
+  <div class="card">
+    <div class="badge"><span class="dot"></span>PIN de acceso</div>
+    <div class="pin-display" id="pinDisplay">------</div>
+    <div class="timer-row">
+      <span class="timer-label">CAMBIA EN</span>
+      <span class="timer-cd" id="countdown">--:--</span>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:100%"></div></div>
+    <div class="clock-row">
+      <div class="clock-now" id="clockNow">--:--:--</div>
+      <div class="clock-date" id="clockDate"></div>
+    </div>
+  </div>
+
+  <!-- Pendientes -->
+  <div class="card green">
+    <div class="badge2"><span class="dot"></span>Pendientes del día</div>
+    <div class="p-list" id="pendientesList">
+      <div class="p-empty">Cargando...</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+// CONFIGURACIÓN
+// ═══════════════════════════════════════════════════════
+const PIN_SECRET    = "MyRevival2024";
+const PIN_INTERVALO = 10;
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwmgeUQkyN8XWS_8Nn2RWlAqocx9MmrDagmo33KrbZ4CO2yKWzzd-d5q5LEp6EdlOOkpA/exec";
+// ═══════════════════════════════════════════════════════
+
+// Fingerprint (mismo algoritmo que index.html)
+function generarFingerprint() {
+  const pantalla = `${screen.width}x${screen.height}`;
+  const zona     = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+  const idioma   = navigator.language || '';
+  const semilla  = `${pantalla}|${zona}|${idioma}`;
+  let hash = 0;
+  for (let i = 0; i < semilla.length; i++) {
+    hash = ((hash << 5) - hash) + semilla.charCodeAt(i); hash |= 0;
+  }
+  return Math.abs(hash).toString(16).toUpperCase().padStart(8, '0');
+}
+const DEVICE_ID = generarFingerprint();
+
+// PIN
+function calcularPIN() {
+  const n = new Date(), v = Math.floor((n.getHours()*60+n.getMinutes())/PIN_INTERVALO);
+  const s = `${PIN_SECRET}-${n.toDateString()}-${v}`;
+  let h = 0; for (let i=0;i<s.length;i++){h=((h<<5)-h)+s.charCodeAt(i);h|=0;}
+  return String(Math.abs(h)%1000000).padStart(6,'0');
+}
+
+function segsRestantes() {
+  const n=new Date(), total=PIN_INTERVALO*60;
+  return total - ((n.getMinutes()%PIN_INTERVALO)*60+n.getSeconds());
+}
+
+function actualizarPIN() {
+  const n = new Date();
+  document.getElementById('clockNow').textContent = n.toLocaleTimeString('es-MX',{hour12:false});
+  document.getElementById('clockDate').textContent = n.toLocaleDateString('es-MX',{weekday:'long',day:'numeric',month:'long'});
+  document.getElementById('pinDisplay').textContent = calcularPIN();
+  const rest=segsRestantes(), total=PIN_INTERVALO*60;
+  const m=Math.floor(rest/60), s=rest%60;
+  document.getElementById('countdown').textContent=`${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  document.getElementById('progressFill').style.width=`${(rest/total)*100}%`;
+}
+
+async function cargarPendientes() {
+  try {
+    const r = await fetch(`${APPS_SCRIPT_URL}?action=getPendientes`);
+    const d = await r.json();
+    const el = document.getElementById('pendientesList');
+    if (!Array.isArray(d) || d.length === 0) {
+      el.innerHTML = '<div class="p-empty">Sin pendientes por hoy ✓</div>';
+      return;
+    }
+    el.innerHTML = d.map(p=>`
+      <div class="p-item">
+        <span class="p-icon">📌</span>
+        <div>
+          <div>${p.tarea}</div>
+          ${p.nota?`<div class="p-nota">${p.nota}</div>`:''}
+        </div>
+      </div>`).join('');
+  } catch(e) {
+    document.getElementById('pendientesList').innerHTML = '<div class="p-empty">Error al cargar pendientes</div>';
+  }
+}
+
+// Verificar si este dispositivo es la tablet autorizada
+async function arrancar() {
+  try {
+    const r = await fetch(`${APPS_SCRIPT_URL}?action=getTabletPIN`);
+    const d = await r.json();
+    const tabletId = d.deviceId || '';
+    if (tabletId && tabletId.toUpperCase() === DEVICE_ID.toUpperCase()) {
+      document.getElementById('mainPanel').classList.add('visible');
+      actualizarPIN();
+      setInterval(actualizarPIN, 1000);
+      cargarPendientes();
+      // Refrescar pendientes cada 5 minutos
+      setInterval(cargarPendientes, 5 * 60 * 1000);
+    } else {
+      document.getElementById('blockedPanel').classList.add('visible');
+    }
+  } catch(e) {
+    // Si falla la verificación mostrar bloqueado
+    document.getElementById('blockedPanel').classList.add('visible');
+  }
+}
+
+arrancar();
+</script>
+</body>
+</html>
